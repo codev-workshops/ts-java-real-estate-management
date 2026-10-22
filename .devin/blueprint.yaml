@@ -1,0 +1,41 @@
+# https://docs.devin.ai/onboard-devin/environment-yaml
+# Angular 19 + Ionic/Capacitor frontend and a Fastify (Node) + MongoDB backend.
+# One-time setup (e.g., install system tools, global CLIs).
+initialize: |
+  nvm install 22 && nvm alias default 22 && nvm use 22
+  ng analytics disable --global || npx --yes @angular/cli analytics disable --global || true
+  docker pull mongo:7
+# Install project dependencies (runs during builds, surfaced to agent at session start).
+maintenance: |
+  nvm use 22
+  docker rm -f rem-mongo >/dev/null 2>&1 || true
+  docker run -d --name rem-mongo -p 27017:27017 mongo:7
+  cd backend-fastify
+  [ -f .env ] || printf "PORT=8000\nLOGGER=true\nSALT=12\nSECRET_KEY='secret'\nDB_CONNECT=mongodb://localhost:27017/rem-db\nUSER_ACTIVITIES_MAX=20\nUSER_NOTIFICATIONS_MAX=30\n" > .env
+  npm install
+  sleep 5 && npm run db:seeder || true
+  cd ../frontend
+  npm install
+  npm run tailwind:build
+# Reference info for agent
+knowledge:
+  - name: start-backend
+    contents: |
+      Fastify API on http://localhost:8000 (needs MongoDB container rem-mongo up).
+      cd backend-fastify && npm start   # or `npm run dev` for nodemon
+      Verify: curl http://localhost:8000/properties/  (Swagger UI at /docs/)
+  - name: start-frontend
+    contents: |
+      Angular/Ionic dev server on http://localhost:4200.
+      cd frontend && NG_CLI_ANALYTICS=false npm start -- --host 0.0.0.0 --port 4200
+      Frontend reads API URL from frontend/src/environments/environment.ts (http://localhost:8000/).
+  - name: mongodb
+    contents: |
+      MongoDB runs in Docker (no local mongod): docker run -d --name rem-mongo -p 27017:27017 mongo:7
+      Seed dummy data: cd backend-fastify && npm run db:seeder (login test@email.com / password)
+  - name: build
+    contents: |
+      cd frontend && npm run build
+  - name: lint
+    contents: |
+      cd frontend && npm run lint
